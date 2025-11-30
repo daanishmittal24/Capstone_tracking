@@ -1,0 +1,192 @@
+// calib_arduino.ino
+#include <Arduino.h>
+
+// ---------- Motor pins ----------
+#define STEP_WHEEL 2
+#define DIR_WHEEL 3
+#define STEP_BASE 8
+#define DIR_BASE 5
+#define ENABLE_PIN 6
+
+// ---------- Encoder pins (set according to wiring) ----------
+#define ENC_BASE_A 2   // NOTE: If using pin 2 for encoder A, avoid conflict with step pins - change pins as per wiring
+#define ENC_BASE_B 4
+#define ENC_WHEEL_A 3
+#define ENC_WHEEL_B 7
+
+// For reliability, choose interrupt-capable pins for A channels (2,3 on many Arduinos).
+// You may need to move step pins if conflicts arise. Adjust wiring as needed.
+
+// ---------- Encoder counts to degrees ----------
+#define COUNTS_PER_REV_BASE 800  // change to your encoder CPR
+#define GEAR_RATIO_BASE 1.0      // set if gearbox
+#define COUNTS_PER_DEGREE_BASE ((COUNTS_PER_REV_BASE * GEAR_RATIO_BASE) / 360.0)
+
+#define COUNTS_PER_REV_WHEEL 800
+#define GEAR_RATIO_WHEEL 1.0
+#define COUNTS_PER_DEGREE_WHEEL ((COUNTS_PER_REV_WHEEL * GEAR_RATIO_WHEEL) / 360.0)
+
+// ---------- Motion params ----------
+#define STEPS_PER_DEGREE_BASE 132
+#define STEPS_PER_DEGREE_WHEEL 132
+#define MAX_BASE_DEG 90
+#define MIN_BASE_DEG -90
+#define MAX_WHEEL_DEG 45
+#define MIN_WHEEL_DEG -45
+
+// ---------- State ----------
+volatile long encBaseCount = 0;
+volatile long encWheelCount = 0;
+long currentBaseDeg = 0;
+long currentWheelDeg = 0;
+
+// ---------- Simple quadrature decode ----------
+void encBaseA_ISR() {
+  bool a = digitalRead(ENC_BASE_A);
+  bool b = digitalRead(ENC_BASE_B);
+  if (a == b) encBaseCount++; else encBaseCount--;
+}
+
+void encWheelA_ISR() {
+  bool a = digitalRead(ENC_WHEEL_A);
+  bool b = digitalRead(ENC_WHEEL_B);
+  if (a == b) encWheelCount++; else encWheelCount--;
+}
+
+// ---------- Utilities ----------
+void clearSerialBuffer() {
+  while (Serial.available() > 0) Serial.read();
+}
+
+void stepMotor(int stepPin, int dirPin, long steps, bool dirCW) {
+  if (steps <= 0) return;
+  digitalWrite(dirPin, dirCW ? HIGH : LOW);
+  delayMicroseconds(50);
+  for (long i = 0; i < steps; ++i) {
+    digitalWrite(stepPin, HIGH);
+    delayMicroseconds(600);
+    digitalWrite(stepPin, LOW);
+    delayMicroseconds(600);
+  }
+}
+
+// Move by degrees, update position using encoders after movement
+bool moveBaseDegrees(int degrees) {
+  if (degrees == 0) return true;
+  long target = currentBaseDeg + degrees;
+  if (target > MAX_BASE_DEG || target < MIN_BASE_DEG) {
+    Serial.println("ERROR: BASE limit exceeded");
+    return false;
+  }
+  long steps = labs((long)degrees * STEPS_PER_DEGREE_BASE);
+  stepMotor(STEP_BASE, DIR_BASE, steps, degrees > 0);
+  // After move, compute deg from encoder counts:
+  long measured_counts = encBaseCount;
+  currentBaseDeg = round((float)measured_counts / COUNTS_PER_DEGREE_BASE);
+  return true;
+}
+
+bool moveWheelDegrees(int degrees) {
+  if (degrees == 0) return true;
+  long target = currentWheelDeg + degrees;
+  if (target > MAX_WHEEL_DEG || target < MIN_WHEEL_DEG) {
+    Serial.println("ERROR: WHEEL limit exceeded");
+    return false;
+  }
+  long steps = labs((long)degrees * STEPS_PER_DEGREE_WHEEL);
+  stepMotor(STEP_WHEEL, DIR_WHEEL, steps, degrees > 0);
+  long measured_counts = encWheelCount;
+  currentWheelDeg = round((float)measured_counts / COUNTS_PER_DEGREE_WHEEL);
+  return true;
+}
+
+void printStatus() {
+  Serial.print("Position: BASE=");
+  Serial.print(currentBaseDeg);
+  Serial.print(" WHEEL=");
+  Serial.print(currentWheelDeg);
+  Serial.println();
+}
+
+void processInput() {
+  if (!Serial.available()) return;
+  String s = Serial.readStringUntil('\n');
+  s.trim();
+  s.toUpperCase();
+  clearSerialBuffer();
+
+  if (s == "STATUS") {
+    // compute from encoder counts to provide freshest reading
+    currentBaseDeg = round((float)encBaseCount / COUNTS_PER_DEGREE_BASE);
+    currentWheelDeg = round((float)encWheelCount / COUNTS_PER_DEGREE_WHEEL);
+    printStatus();
+    return;
+  }
+  if (s == "ZERO") {
+    encBaseCount = 0;
+    encWheelCount = 0;
+    currentBaseDeg = 0;
+    currentWheelDeg = 0;
+    Serial.println("Position reset to (0,0)");
+    return;
+  }
+
+  if (s.startsWith("B") && s.indexOf("W") > 0) {
+    int b=0, w=0;
+    sscanf(s.c_str(), "B%d W%d", &b, &w);
+    // clamp command magnitude per move
+    const int MAX_CMD = 60;
+    if (b > MAX_CMD) b = MAX_CMD;
+    if (b < -MAX_CMD) b = -MAX_CMD;
+    if (w > MAX_CMD) w = MAX_CMD;
+    if (w < -MAX_CMD) w = -MAX_CMD;
+
+    long targetB = currentBaseDeg + b;
+    long targetW = currentWheelDeg + w;
+    if (targetB > MAX_BASE_DEG || targetB < MIN_BASE_DEG || targetW > MAX_WHEEL_DEG || targetW < MIN_WHEEL_DEG) {
+      Serial.println("ERROR: Movement would exceed limits");
+      return;
+    }
+
+    Serial.print("Moving: B"); Serial.print(b); Serial.print(" W"); Serial.println(w);
+    if (b != 0) moveBaseDegrees(b);
+    if (w != 0) moveWheelDegrees(w);
+    Serial.println("DONE");
+    printStatus();
+    return;
+  }
+
+  Serial.println("ERROR: Unknown command");
+}
+
+// ---------- Setup & loop ----------
+void setup() {
+  Serial.begin(115200);
+  // pins
+  pinMode(STEP_WHEEL, OUTPUT);
+  pinMode(DIR_WHEEL, OUTPUT);
+  pinMode(STEP_BASE, OUTPUT);
+  pinMode(DIR_BASE, OUTPUT);
+  pinMode(ENABLE_PIN, OUTPUT);
+  digitalWrite(ENABLE_PIN, LOW);
+
+  // encoder pins
+  pinMode(ENC_BASE_A, INPUT_PULLUP);
+  pinMode(ENC_BASE_B, INPUT_PULLUP);
+  pinMode(ENC_WHEEL_A, INPUT_PULLUP);
+  pinMode(ENC_WHEEL_B, INPUT_PULLUP);
+
+  // attach interrupts - use CHANGE or RISING on A pin depending on encoder
+  attachInterrupt(digitalPinToInterrupt(ENC_BASE_A), encBaseA_ISR, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENC_WHEEL_A), encWheelA_ISR, CHANGE);
+
+  Serial.println();
+  Serial.println("CALIB ARDUINO READY");
+  Serial.print("COUNTS_PER_DEGREE_BASE: "); Serial.println(COUNTS_PER_DEGREE_BASE);
+  Serial.print("COUNTS_PER_DEGREE_WHEEL: "); Serial.println(COUNTS_PER_DEGREE_WHEEL);
+  Serial.println("Commands: STATUS, ZERO, B<deg> W<deg>");
+}
+
+void loop() {
+  processInput();
+}

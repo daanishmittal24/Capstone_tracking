@@ -1,0 +1,112 @@
+{
+  "timestamp": 1764490638.105255,
+  "mapping_points": [
+    {
+      "wheel_degrees": -25.032,
+      "arducam_y_normalized": 0.059722222222222225,
+      "arducam_y_pixels": 43
+    },
+    {
+      "wheel_degrees": -23.032,
+      "arducam_y_normalized": 0.12638888888888888,
+      "arducam_y_pixels": 91
+    },
+    {
+      "wheel_degrees": -20.032,
+      "arducam_y_normalized": 0.24861111111111112,
+      "arducam_y_pixels": 179
+    },
+    {
+      "wheel_degrees": -16.032,
+      "arducam_y_normalized": 0.4444444444444444,
+      "arducam_y_pixels": 320
+    },
+    {
+      "wheel_degrees": -15.032,
+      "arducam_y_normalized": 0.45,
+      "arducam_y_pixels": 324
+    },
+    {
+      "wheel_degrees": -13.032,
+      "arducam_y_normalized": 0.5,
+      "arducam_y_pixels": 360
+    },
+    {
+      "wheel_degrees": -13.032,
+      "arducam_y_normalized": 0.5291666666666667,
+      "arducam_y_pixels": 381
+    },
+    {
+      "wheel_degrees": -12.032,
+      "arducam_y_normalized": 0.5833333333333334,
+      "arducam_y_pixels": 420
+    },
+    {
+      "wheel_degrees": -12.032,
+      "arducam_y_normalized": 0.5430555555555555,
+      "arducam_y_pixels": 390
+    },
+    {
+      "wheel_degrees": -11.032,
+      "arducam_y_normalized": 0.5833333333333334,
+      "arducam_y_pixels": 420
+    },
+    {
+      "wheel_degrees": -10.032,
+      "arducam_y_normalized": 0.6402777777777777,
+      "arducam_y_pixels": 460
+    },
+    {
+      "wheel_degrees": -9.032,
+      "arducam_y_normalized": 0.6472222222222223,
+      "arducam_y_pixels": 466
+    },
+    {
+      "wheel_degrees": -8.032,
+      "arducam_y_normalized": 0.6972222222222222,
+      "arducam_y_pixels": 502
+    },
+    {
+      "wheel_degrees": -7.032,
+      "arducam_y_normalized": 0.7416666666666667,
+      "arducam_y_pixels": 534
+    },
+    {
+      "wheel_degrees": -6.032,
+      "arducam_y_normalized": 0.7902777777777777,
+      "arducam_y_pixels": 569
+    },
+    {
+      "wheel_degrees": -5.032,
+      "arducam_y_normalized": 0.8486111111111111,
+      "arducam_y_pixels": 611
+    },
+    {
+      "wheel_degrees": -5.032,
+      "arducam_y_normalized": 0.775,
+      "arducam_y_pixels": 558
+    },
+    {
+      "wheel_degrees": -3.032,
+      "arducam_y_normalized": 0.9375,
+      "arducam_y_pixels": 675
+    },
+    {
+      "wheel_degrees": -3.032,
+      "arducam_y_normalized": 0.9055555555555556,
+      "arducam_y_pixels": 652
+    },
+    {
+      "wheel_degrees": -2.032,
+      "arducam_y_normalized": 0.9513888888888888,
+      "arducam_y_pixels": 685
+    }
+  ],
+  "wheel_limits": {
+    "min_degrees": -25.032,
+    "max_degrees": -2.032,
+    "range_degrees": 23.0
+  },
+  "num_points": 20,
+  "calibration_version": "3.0_manual_realtime"
+}

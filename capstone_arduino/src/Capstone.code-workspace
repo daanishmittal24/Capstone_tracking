@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "../../Capstone"
+		},
+		{
+			"name": "capstone_arduino",
+			"path": ".."
+		}
+	],
+	"settings": {}
+}
