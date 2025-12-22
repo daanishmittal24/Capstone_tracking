@@ -1,0 +1,40 @@
+{
+  "source_mapping": "vertical_mapping3.json",
+  "model": {
+    "degree": 3,
+    "coefficients": [
+      -2.228374777742927,
+      1.884255855022168,
+      23.6851542379563,
+      -18.120377521808564
+    ],
+    "x_min": 0.05694444444444444,
+    "x_max": 0.9527777777777777,
+    "wheel_min": -18.0,
+    "wheel_max": 6.0,
+    "r2": 0.985446075145006
+  },
+  "note": "Polynomial regression fitted on arducam_y_normalized \u2192 wheel_degrees",
+  "sample_predictions": [
+    {
+      "arducam_y_normalized": 0.05694444444444444,
+      "pred_wheel_degrees": -18.0
+    },
+    {
+      "arducam_y_normalized": 0.2809027777777778,
+      "pred_wheel_degrees": -12.116141327282834
+    },
+    {
+      "arducam_y_normalized": 0.5048611111111111,
+      "pred_wheel_degrees": -6.0852832862927375
+    },
+    {
+      "arducam_y_normalized": 0.7288194444444445,
+      "pred_wheel_degrees": -0.2367135342516633
+    },
+    {
+      "arducam_y_normalized": 0.9527777777777777,
+      "pred_wheel_degrees": 5.220657793426977
+    }
+  ]
+}

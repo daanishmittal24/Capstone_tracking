@@ -1,3 +1,4 @@
+
 """
 track_dual_independent.py
 
@@ -78,6 +79,7 @@ WHEEL_MOVE_COOLDOWN = 0.35  # Faster successive moves (was 0.8)
 
 # Vertical calibration mapping
 VERTICAL_MAPPING_FILE = 'vertical_mapping.json'
+VERTICAL_REGRESSION_DEGREE = 2  # Polynomial degree for regression mapping (1 = linear)
 
 # Homing and serial timing
 HOMING_STATUS_DELAY = 0.5
@@ -112,16 +114,21 @@ shared_motion_state = None  # Shared wheel/base estimates across processes
 
 
 class VerticalMapping:
-    """Linear interpolation helper from Arducam Y to wheel degrees."""
-    def __init__(self, samples):
+    """Map Arducam normalized Y to wheel degrees using polynomial regression."""
+    def __init__(self, samples, regression_degree=None):
         if not samples:
             raise ValueError('Vertical mapping requires at least one sample')
+
+        degree = VERTICAL_REGRESSION_DEGREE if regression_degree is None else int(regression_degree)
+        degree = max(1, degree)
+
         cleaned = []
         for item in samples:
             y = float(item['arducam_y_normalized'])
             w = float(item['wheel_degrees'])
             cleaned.append((y, w))
         cleaned.sort(key=lambda p: p[0])
+
         # Remove duplicates with identical Y by keeping the latest entry
         unique = []
         for y, w in cleaned:
@@ -129,23 +136,48 @@ class VerticalMapping:
                 unique.append((y, w))
             else:
                 unique[-1] = (y, w)
+
         self.samples = unique
         self.y_min = self.samples[0][0]
         self.y_max = self.samples[-1][0]
+        ys = np.array([p[0] for p in self.samples], dtype=float)
+        ws = np.array([p[1] for p in self.samples], dtype=float)
+        self.wheel_min = float(ws.min())
+        self.wheel_max = float(ws.max())
+
+        # Fit polynomial regression; cap degree to available unique samples - 1
+        self.coeffs = None
+        try:
+            fit_degree = min(degree, len(self.samples) - 1) if len(self.samples) > 1 else 1
+            self.coeffs = np.polyfit(ys, ws, fit_degree)
+        except Exception as exc:
+            print(f'[Mapping] ⚠️ Regression fit failed ({exc}); falling back to interpolation')
+            self.coeffs = None
 
     @classmethod
-    def load(cls, path):
+    def load(cls, path, regression_degree=None):
         with open(path, 'r') as f:
             data = json.load(f)
         points = data.get('mapping_points', [])
         if not points:
             raise ValueError('Mapping file is missing "mapping_points" entries')
-        return cls(points)
+        return cls(points, regression_degree=regression_degree)
 
     def lookup(self, y_norm):
         if not self.samples:
             return 0.0
+
+        # Clamp input to observed range
         y = min(max(y_norm, self.y_min), self.y_max)
+
+        # Primary path: polynomial regression prediction
+        if self.coeffs is not None:
+            pred = float(np.polyval(self.coeffs, y))
+            # Clamp to observed wheel range to avoid extreme extrapolation
+            pred = max(self.wheel_min, min(self.wheel_max, pred))
+            return pred
+
+        # Fallback: original piecewise-linear interpolation
         if y <= self.samples[0][0]:
             return self.samples[0][1]
         for i in range(1, len(self.samples)):
@@ -771,7 +803,7 @@ def zoomcam_process(serial_lock, stop_event, shared_face_state, motion_state, ma
     print('[ZoomCam] Starting mapped vertical tracking...')
 
     try:
-        vertical_mapping = VerticalMapping(mapping_points)
+        vertical_mapping = VerticalMapping(mapping_points, regression_degree=VERTICAL_REGRESSION_DEGREE)
         print(f'[ZoomCam] ✅ Loaded mapping ({len(vertical_mapping.samples)} samples)')
     except Exception as exc:
         print(f'[ZoomCam] ❌ Mapping failed: {exc}')
@@ -1155,7 +1187,7 @@ def main():
     shared_motion_state['wheel_deg'] = 0.0
 
     try:
-        mapping = VerticalMapping.load(VERTICAL_MAPPING_FILE)
+        mapping = VerticalMapping.load(VERTICAL_MAPPING_FILE, regression_degree=VERTICAL_REGRESSION_DEGREE)
         mapping_payload = [
             {'arducam_y_normalized': y, 'wheel_degrees': w}
             for y, w in mapping.samples
